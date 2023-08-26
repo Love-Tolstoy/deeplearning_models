@@ -1,10 +1,12 @@
 import os
 
+import numpy as np
 import torch
 import torchvision
 from PIL import Image
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -77,7 +79,7 @@ class MyNet(nn.Module):
             nn.Dropout(),
 
             nn.Linear(in_features=256, out_features=32),
-            nn.Linear(in_features=32, out_features=2)
+            nn.Linear(in_features=32, out_features=2),
         )
     def forward(self, x):
         y = self.hidden_layer(x)
@@ -110,11 +112,13 @@ loss_fn = nn.CrossEntropyLoss()
 loss_fn = loss_fn.to(device)
 
 learning_rate = 1e-3
-optim = torch.optim.Adam(my_net.parameters(), lr=learning_rate)
+
+optim = torch.optim.SGD(my_net.parameters(), lr=learning_rate, momentum=0.9)
 
 train_steps = 0
 
-epochs = 50
+epochs = 10
+writer = SummaryWriter("logs")
 
 if __name__ == '__main__':
     for i in range(epochs):
@@ -136,8 +140,8 @@ if __name__ == '__main__':
                 print(f"训练次数:{train_steps}, loss:{loss}")
 
         my_net.eval()
-        accuarcy = 0
-        accuarcy_total = 0
+        accuracy = 0
+        accuracy_total = 0
         with torch.no_grad():
             for data in test_data_load:
                 images, targets = data
@@ -145,11 +149,12 @@ if __name__ == '__main__':
                 targets = targets.to(device)
 
                 outputs = my_net(images)
-                accuarcy = (outputs.argmax(axis=1) == targets).sum()
-                accuarcy_total += accuarcy
-            print(f"第{i+1}轮训练的准确率为: {accuarcy_total / test_data_size}")
-            torch.save(my_net, f"ants_bees_{i + 1}_acc_{accuarcy_total/ test_data_size}")
-
+                accuracy = (outputs.argmax(axis=1) == targets).sum()
+                accuracy_total += accuracy
+            print(f"第{i+1}轮训练的准确率为: {accuracy_total / test_data_size}")
+            writer.add_scalar("acc", accuracy_total / test_data_size, i+1)  # 第二个参数不能加括号
+            torch.save(my_net, f"ants_bees_{i + 1}_acc_{accuracy_total/ test_data_size}")
+writer.close()
 
 
 
